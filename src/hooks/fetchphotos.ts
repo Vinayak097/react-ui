@@ -1,39 +1,56 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
- export default function useFetchphotos(){
-    
-    const [photos,setphotos]=useState<any[]|null>(null)
+export type PhotoType = {
+  id: string;
+  author: string;
+  width: number;
+  height: number;
+  url: string;
+  download_url: string;
+};
 
-    const [error,setError]=useState("")
+export default function useFetchPhotos() {
+  const [photos, setPhotos] = useState<PhotoType[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-    const [loading,setLoading]=useState(false)
-    
-    const fetchphotos=useCallback(async()=>{
-        try{
-        const result =await fetch("https://picsum.photos/v2/list?limit=30")
-        const data = await result.json()
-        return data  
-        }catch(e:any){
-            console.log(e.message , ' error in the fetchphots')
-            setError("error fetching the phots")
-            return null
-            
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function fetchPhotos() {
+      try {
+        const response = await fetch(
+          "https://picsum.photos/v2/list?limit=30",
+          { signal: controller.signal },
+        );
+
+        if (!response.ok) {
+          throw new Error(`The photo request failed (${response.status}).`);
         }
 
-
-    },[])
-
-    useEffect(()=>{
-        async function main(){
-            const data =await  fetchphotos()
-             if(!data){
-            return
-        }
-        console.log("data")
-        setphotos(data)
+        const data: PhotoType[] = await response.json();
+        setPhotos(data);
+      } catch (err) {
+        if (controller.signal.aborted) {
+          return;
         }
 
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Something went wrong while loading photos.",
+        );
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    }
 
-        main()  
-    })
+    void fetchPhotos();
+
+    return () => controller.abort();
+  }, []);
+
+  return { photos, loading, error };
 }
